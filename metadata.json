@@ -1,0 +1,6 @@
+{
+  "name": "EventEase – Multi-Tenant Event & Ticket Reservation System",
+  "description": "Multi-tenant event ticketing and reservation platform with role-based access, atomic inventory holds, payment simulation, and real-time organizer analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

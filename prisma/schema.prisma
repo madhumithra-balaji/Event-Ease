@@ -1,0 +1,172 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  ORGANIZER
+  ATTENDEE
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  SOLD_OUT
+  CANCELLED
+  COMPLETED
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  EXPIRED
+  CANCELLED
+}
+
+enum OrderStatus {
+  CONFIRMED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id           String        @id @default(uuid())
+  name         String
+  email        String        @unique
+  passwordHash String
+  role         Role          @default(ATTENDEE)
+  isApproved   Boolean       @default(true) // For organizers approval
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  events       Event[]       @relation("OrganizerEvents")
+  reservations Reservation[]
+  orders       Order[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model Event {
+  id              String        @id @default(uuid())
+  organizerId     String
+  organizer       User          @relation("OrganizerEvents", fields: [organizerId], references: [id], onDelete: Cascade)
+  title           String
+  description     String
+  category        String
+  venue           String
+  eventDate       DateTime
+  salesCutoffDate DateTime
+  bannerUrl       String
+  status          EventStatus   @default(DRAFT)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  ticketTypes     TicketType[]
+  reservations    Reservation[]
+
+  @@index([organizerId])
+  @@index([status])
+  @@index([category])
+  @@index([eventDate])
+}
+
+model TicketType {
+  id                String            @id @default(uuid())
+  eventId           String
+  event             Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name              String
+  price             Decimal           @db.Decimal(10, 2)
+  totalQuantity     Int
+  availableQuantity Int
+  reservedQuantity  Int               @default(0)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  reservationItems  ReservationItem[]
+
+  @@index([eventId])
+}
+
+model Reservation {
+  id             String            @id @default(uuid())
+  userId         String
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventId        String
+  event          Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  status         ReservationStatus @default(PENDING)
+  expiresAt      DateTime
+  totalAmount    Decimal           @db.Decimal(10, 2)
+  idempotencyKey String?           @unique
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  items          ReservationItem[]
+  order          Order?
+
+  @@index([userId])
+  @@index([eventId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model ReservationItem {
+  id            String      @id @default(uuid())
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  ticketTypeId  String
+  ticketType    TicketType  @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+  quantity      Int
+  unitPrice     Decimal     @db.Decimal(10, 2)
+
+  @@index([reservationId])
+  @@index([ticketTypeId])
+}
+
+model Order {
+  id            String         @id @default(uuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reservationId String         @unique
+  reservation   Reservation    @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  orderNumber   String         @unique
+  totalAmount   Decimal        @db.Decimal(10, 2)
+  status        OrderStatus    @default(CONFIRMED)
+  createdAt     DateTime       @default(now())
+
+  transactions  Transaction[]
+
+  @@index([userId])
+  @@index([orderNumber])
+}
+
+model Transaction {
+  id               String        @id @default(uuid())
+  orderId          String
+  order            Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentReference String        @unique
+  amount           Decimal       @db.Decimal(10, 2)
+  paymentMethod    String
+  status           PaymentStatus @default(PENDING)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([orderId])
+  @@index([paymentReference])
+  @@index([status])
+}
